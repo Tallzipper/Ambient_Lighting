@@ -67,3 +67,11 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# From vscode
+.vs/
+.vscode/
+*.sln
+*.vcxproj
+*.filters
+*.user
