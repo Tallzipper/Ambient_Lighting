@@ -17,7 +17,7 @@
  *                    your display without needing to switch cables
  * 
  *          - Computer
- *              * Must be a semi-modern computer; the Video Capture card is a 
+ *              * Must be a semi-modern computer, the Video Capture card is a 
  *                bit of a resource junkie so be warned
  *                  - If you'll use a Raspberry Pi, have it be 4 or above
  *              * My current computer runs this program fine:
@@ -55,14 +55,13 @@
 int main(){
 
     int index = -1;              
-    cv::Mat screen;             // For the image matrix to allocate LEDs
-    cv::VideoCapture capture;   // Hardware for capturing video, 
-                                //     0 is webcam, 1 and up is video capture
+    cv::Mat screen;                     // For the image matrix to allocate LEDs
+    cv::VideoCapture capture;           // Hardware for capturing video, 
+                                        //     0 is webcam, 1 and up is video capture
 
-    int edgePixels = 60;         // Adjustable, grabs edge of screen and 
-                                 //     gives that to the LEDs
+    int edgePixels = 60;                // Amount of screen the edge peers into
 
-    for(int i = 1; i <= 2; i++){ // Trying indices to see which is the video capture
+    for(int i = 1; i <= 2; i++){        // Trying indices to see which is the video capture
         capture.open(i, cv::CAP_DSHOW);
 
         if(capture.isOpened()){
@@ -76,15 +75,15 @@ int main(){
         }
     }
 
-    if(!capture.isOpened()){     // Ensures video capture is connected;
+    if(!capture.isOpened()){            // Ensures video capture is connected;
         std::cerr << "Video Capture Hardware failed to initialize";
         return -1;
     }
 
-    while(1){
+    while(1){                           // Loop for video display
 
-        capture >> screen;       // Grab the current set of pixels on screen
-        if(screen.empty()){      // Verifys that screen had something
+        capture >> screen;              // Grab current display 
+        if(screen.empty()){             
             std::cerr << "Video Capture did not grab what was on the screen";
             break;                   
         }
@@ -92,76 +91,59 @@ int main(){
         int width = screen.cols;
         int height = screen.rows;
 
-        // Creates an area of each of the pixels 
+        int subwidth = width / 32;      // Divided number for both determines
+        int subheight = height / 32;    //  how many squares in that section
 
-        cv::Rect leftArea(0, 0, edgePixels, height);
-        cv::Rect rightArea(width - edgePixels, 0, edgePixels, height);
-        cv::Rect topArea(0, 0, width, edgePixels);
-        cv::Rect bottomArea(0, height - edgePixels, width, edgePixels);
+        int lightSize = 40;             // Size of each individual 'light'
 
-        // Creates a sub-image from the area of the pixels with its own colors
+        // One master window will open with four sides of 'lights' surrounding it //
 
-        cv::Mat leftPixels      = screen(leftArea);
-        cv::Mat rightPixels     = screen(rightArea);
-        cv::Mat topPixels       = screen(topArea);
-        cv::Mat bottomPixels    = screen(bottomArea);
+        //  Here will be only the 'lights' which will border the main display
+        cv::Mat dashboard(height + (lightSize * 2), 
+                          width + (lightSize * 2), 
+                          CV_8UC3, 
+                          cv::Scalar(0,0,0));
 
-        // Creates a sort of array holding color values
+        //  That main display is added here overlapping the border
 
-        cv::Scalar leftMean     = cv::mean(leftPixels);
-        cv::Scalar rightMean    = cv::mean(rightPixels);
-        cv::Scalar topMean      = cv::mean(topPixels);
-        cv::Scalar bottomMean   = cv::mean(bottomPixels);
+        screen.copyTo(dashboard(cv::Rect(lightSize,lightSize,width,height)));
 
-        // Colors for the borders
 
-        int leftB               = static_cast<int>(leftMean[0]);
-        int leftG               = static_cast<int>(leftMean[1]);
-        int leftR               = static_cast<int>(leftMean[2]);
+        // The loop here will serve to create each of the lights for the display
 
-        int rightB              = static_cast<int>(rightMean[0]);
-        int rightG              = static_cast<int>(rightMean[1]);
-        int rightR              = static_cast<int>(rightMean[2]);
+        for(int i = 0; i < 32; i++){    //  32 for each side
 
-        int topB                = static_cast<int>(topMean[0]);
-        int topG                = static_cast<int>(topMean[1]);
-        int topR                = static_cast<int>(topMean[2]);
+            int currentW = subwidth;
+            int currentH = subheight;
 
-        int bottomB             = static_cast<int>(bottomMean[0]);
-        int bottomG             = static_cast<int>(bottomMean[1]);
-        int bottomR             = static_cast<int>(bottomMean[2]);
+            if(i == 31){
+                currentW = width - (subwidth * i);
+                currentH = height - (subheight * i);
+            } 
 
-        cv::Mat leftLight(100, 100, CV_8UC3, leftMean);
-        cv::Mat rightLight(100, 100, CV_8UC3, rightMean);
-        cv::Mat topLight(100, 100, CV_8UC3, topMean);
-        cv::Mat bottomLight(100, 100, CV_8UC3, bottomMean);
+            // Get the colors of the section of the screen
 
-        // Displays color information of the screen into the terminal in order of Blue Green Red
+            cv::Mat leftSlice   = screen(cv::Rect(0, subheight * i, edgePixels, currentH));
+            cv::Mat rightSlice  = screen(cv::Rect(width - edgePixels, subheight * i, edgePixels, currentH));
+            cv::Mat topSlice    = screen(cv::Rect(subwidth * i, 0, currentW, edgePixels));
+            cv::Mat bottomSlice = screen(cv::Rect(subwidth * i, height - edgePixels, currentW, edgePixels));
 
-        std::cout << "\033[2J\033[1;1H"; // current terminal will be replaced with new information
+            // Place each of the colors onto the lights they belong to
 
-        std::cout << "Left Edge BGR:   (" << leftB << ", " << leftG << ", " << leftR << ")\n";
-        std::cout << "Right Edge BGR:  (" << rightB << ", " << rightG << ", " << rightR << ")\n";
-        std::cout << "Top Edge BGR:    (" << topB << ", " << topG << ", " << topR << ")\n";
-        std::cout << "Bottom Edge BGR: (" << bottomB << ", " << bottomG << ", " << bottomR << ")\n";
+            dashboard(cv::Rect(0, lightSize + (subheight * i), lightSize, currentH)).setTo(cv::mean(leftSlice)); // Left
+            dashboard(cv::Rect(width + lightSize, lightSize + (subheight * i), lightSize, currentH)).setTo(cv::mean(rightSlice)); // Right
+            dashboard(cv::Rect(lightSize + (subwidth * i), 0, currentW, lightSize)).setTo(cv::mean(topSlice)); // Top
+            dashboard(cv::Rect(lightSize + (subwidth * i), height + lightSize, currentW, lightSize)).setTo(cv::mean(bottomSlice)); // Bottom
+        }
 
-        std::cout << std::flush; // Information is pushed out quickly due to speed of program
-
-        // Updating/Creating windows 
-
-        cv::imshow("Ambient Light", screen);
-
-        cv::imshow("Left Strip", leftLight);
-        cv::imshow("Right Strip", rightLight);
-        cv::imshow("Top Strip", topLight);
-        cv::imshow("Bottom Strip", bottomLight);
+        cv::imshow("Ambilight Command Center", dashboard);
 
         // Press q to escape
 
         if (cv::waitKey(30) == 'q'){
             break;
         }
-
+        
     }
 
     // When escaped, stop recording, kill windows, and exit program
