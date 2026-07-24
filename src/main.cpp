@@ -1,6 +1,8 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 
+#include "../include/helper.h"
+
 /*
  * How to use: 
  * 
@@ -46,43 +48,40 @@
  * 
  *  3. Controls:
  *  
- *      - Five preview windows will open showing your video feed and the individual
+ *      - A window will open showing your video feed and the individual
  *        edge colors
  *      - Exit the program at any time by pressing 'q' with any opened window in focus
  * 
  */
 
 int main(){
+            
+    cv::Mat screen; // For the image matrix to allocate LEDs
+    cv::VideoCapture capture; // Hardware for capturing video 0 is webcam, 1 and up is video capture
 
-    int index = -1;              
-    cv::Mat screen;                     // For the image matrix to allocate LEDs
-    cv::VideoCapture capture;           // Hardware for capturing video, 
-                                        //     0 is webcam, 1 and up is video capture
+    int edgePixels = 60; // Amount of screen the edge peers into
 
-    int edgePixels = 60;                // Amount of screen the edge peers into
-
-    for(int i = 1; i <= 2; i++){        // Trying indices to see which is the video capture
+    for(int i = 1; i <= 2; i++){ // Trying indices to see which is the video capture
         capture.open(i, cv::CAP_DSHOW);
 
         if(capture.isOpened()){
             cv::Mat testScreen;
             capture >> testScreen;
             
-            if(!testScreen.empty()){    // If i is video capture, use i
-                index = i;
+            if(!testScreen.empty()){ // If i is video capture, use i
                 break;
             }   
         }
     }
 
-    if(!capture.isOpened()){            // Ensures video capture is connected;
+    if(!capture.isOpened()){ // Ensures video capture is connected;
         std::cerr << "Video Capture Hardware failed to initialize";
         return -1;
     }
 
-    while(1){                           // Loop for video display
+    while(1){ // Loop for video display
 
-        capture >> screen;              // Grab current display 
+        capture >> screen; // Grab current display 
         if(screen.empty()){             
             std::cerr << "Video Capture did not grab what was on the screen";
             break;                   
@@ -91,14 +90,17 @@ int main(){
         int width = screen.cols;
         int height = screen.rows;
 
-        int subwidth = width / 32;      // Divided number for both determines
-        int subheight = height / 32;    //  how many squares in that section
+        // Divided number for both determines how many squares in that section
 
-        int lightSize = 40;             // Size of each individual 'light'
+        int subwidth = width / 32;      
+        int subheight = height / 32;    
+
+        int lightSize = 40; // Size of each individual 'light'
 
         // One master window will open with four sides of 'lights' surrounding it //
 
         //  Here will be only the 'lights' which will border the main display
+
         cv::Mat dashboard(height + (lightSize * 2), 
                           width + (lightSize * 2), 
                           CV_8UC3, 
@@ -111,7 +113,7 @@ int main(){
 
         // The loop here will serve to create each of the lights for the display
 
-        for(int i = 0; i < 32; i++){    //  32 for each side
+        for(int i = 0; i < 32; i++){ //  32 for each side
 
             int currentW = subwidth;
             int currentH = subheight;
@@ -130,10 +132,10 @@ int main(){
 
             // Place each of the colors onto the lights they belong to
 
-            dashboard(cv::Rect(0, lightSize + (subheight * i), lightSize, currentH)).setTo(cv::mean(leftSlice)); // Left
-            dashboard(cv::Rect(width + lightSize, lightSize + (subheight * i), lightSize, currentH)).setTo(cv::mean(rightSlice)); // Right
-            dashboard(cv::Rect(lightSize + (subwidth * i), 0, currentW, lightSize)).setTo(cv::mean(topSlice)); // Top
-            dashboard(cv::Rect(lightSize + (subwidth * i), height + lightSize, currentW, lightSize)).setTo(cv::mean(bottomSlice)); // Bottom
+            dashboard(cv::Rect(0, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(leftSlice)); // Left
+            dashboard(cv::Rect(width + lightSize, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(rightSlice)); // Right
+            dashboard(cv::Rect(lightSize + (subwidth * i), 0, currentW, lightSize)).setTo(getVibrantMean(topSlice)); // Top
+            dashboard(cv::Rect(lightSize + (subwidth * i), height + lightSize, currentW, lightSize)).setTo(getVibrantMean(bottomSlice)); // Bottom
         }
 
         cv::imshow("Ambilight Command Center", dashboard);
