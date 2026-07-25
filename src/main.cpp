@@ -79,14 +79,12 @@ int main(){
         return -1;
     }
 
-    while(1){ // Loop for video display
+        // Sets up the dashboard once so doesn't need to keep being recreated
 
-        capture >> screen; // Grab current display 
-        if(screen.empty()){             
-            std::cerr << "Video Capture did not grab what was on the screen";
-            break;                   
-        }
+        capture >> screen;
 
+        // One master window will open with four sides of 'lights' surrounding it //
+        //  Here will be only the 'lights' which will border the main display
         int width = screen.cols;
         int height = screen.rows;
 
@@ -97,14 +95,19 @@ int main(){
 
         int lightSize = 40; // Size of each individual 'light'
 
-        // One master window will open with four sides of 'lights' surrounding it //
-
-        //  Here will be only the 'lights' which will border the main display
-
         cv::Mat dashboard(height + (lightSize * 2), 
                           width + (lightSize * 2), 
                           CV_8UC3, 
                           cv::Scalar(0,0,0));
+
+
+    while(1){ // Loop for video display
+
+        capture >> screen; // Grab current display 
+        if(screen.empty()){             
+            std::cerr << "Video Capture did not grab what was on the screen";
+            break;                   
+        }
 
         //  That main display is added here overlapping the border
 
