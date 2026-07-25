@@ -25,7 +25,7 @@ cv::Scalar getVibrantMean(const cv::Mat& slice){
             double saturation = 0;
 
             if(maxColor > 0){
-                (maxColor - minColor)/maxColor;
+               saturation = static_cast<double>(maxColor - minColor)/maxColor;
             }
 
             double weight = brightness * saturation * saturation * saturation + 0.01;

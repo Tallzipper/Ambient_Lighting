@@ -142,10 +142,10 @@ int main(){
 
         // Press q to escape
 
-        if (cv::waitKey(30) == 'q'){
+        if (cv::waitKey(2) == 'q'){
             break;
         }
-        
+    
     }
 
     // When escaped, stop recording, kill windows, and exit program
