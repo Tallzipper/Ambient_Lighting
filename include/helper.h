@@ -22,12 +22,14 @@ cv::Scalar getVibrantMean(const cv::Mat& slice){
             unsigned char maxColor = std::max({red, green, blue});
             unsigned char minColor = std::min({red, green, blue});
 
+            // Set as 0 in case pixel grabbed is entirely black
             double saturation = 0;
 
             if(maxColor > 0){
                saturation = static_cast<double>(maxColor - minColor)/maxColor;
             }
 
+            // determines intensity of the color
             double weight = brightness * saturation * saturation * saturation + 0.01;
 
             totalWeight = (weight) + totalWeight;
@@ -38,13 +40,27 @@ cv::Scalar getVibrantMean(const cv::Mat& slice){
 
         }
     }
-    if(totalWeight <= 0.01){
+    if(totalWeight <= 0.01){ // Black since one of the values was 0
         return cv::Scalar(0,0,0);
     }
-    else{
+    else{ // Intensity is calculated and returned for LED
         return cv::Scalar(  weightBlue / totalWeight, 
                             weightGreen/ totalWeight, 
                             weightRed / totalWeight);
     }
 
 }
+
+    void getScreenSize(int& width, int& height){ // Creates temp window to get screen resolution
+
+        std::string windowName = "Screen Size Evaluator";
+        
+        cv::namedWindow(windowName, cv::WINDOW_NORMAL);
+        cv::setWindowProperty(windowName, cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
+
+        cv::Rect screen = cv::getWindowImageRect(windowName);
+        width  = screen.width;
+        height = screen.height;
+
+        cv::destroyWindow(windowName);
+    }

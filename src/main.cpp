@@ -55,6 +55,11 @@
  */
 
 int main(){
+
+    int screenWidth  = 0;
+    int screenHeight = 0;
+
+    getScreenSize(screenWidth, screenHeight);
             
     cv::Mat screen; // For the image matrix to allocate LEDs
     cv::VideoCapture capture; // Hardware for capturing video 0 is webcam, 1 and up is video capture
@@ -84,7 +89,7 @@ int main(){
         capture >> screen;
 
         // One master window will open with four sides of 'lights' surrounding it //
-        //  Here will be only the 'lights' which will border the main display
+        // Here will be only the 'lights' which will border the main display
         int width = screen.cols;
         int height = screen.rows;
 
@@ -95,10 +100,18 @@ int main(){
 
         int lightSize = 40; // Size of each individual 'light'
 
+        // This is the entire screen (non zoomed in)
         cv::Mat dashboard(height + (lightSize * 2), 
                           width + (lightSize * 2), 
                           CV_8UC3, 
                           cv::Scalar(0,0,0));
+
+        // The process of creating a window that full screens
+        // create the name, have the window open, set the window to its size, have the window created
+        std::string windowName = "Ambilight Command Center";
+        cv::namedWindow(windowName, cv::WINDOW_NORMAL);
+        cv::setWindowProperty(windowName, cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
+        cv::Mat fullScreen;
 
 
     while(1){ // Loop for video display
@@ -141,14 +154,16 @@ int main(){
             dashboard(cv::Rect(lightSize + (subwidth * i), height + lightSize, currentW, lightSize)).setTo(getVibrantMean(bottomSlice)); // Bottom
         }
 
-        cv::imshow("Ambilight Command Center", dashboard);
+        cv::resize(dashboard, fullScreen, cv::Size(screenWidth, screenHeight), 0, 0, cv::INTER_NEAREST);
+
+        cv::imshow("Ambilight Command Center", fullScreen);
 
         // Press q to escape
 
         if (cv::waitKey(2) == 'q'){
             break;
         }
-    
+
     }
 
     // When escaped, stop recording, kill windows, and exit program
