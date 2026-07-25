@@ -23,8 +23,9 @@ Gif will be added along with a youtube video
 
 - [x]   Diagnostics File: Shows what the LEDs would be picking up and tests your capture card, hdmi-splitter, and input device
 - [ ]   Main program: Using LEDs and ESP32 as an addion
-- [ ]   Improving Pixel Capture: Fixing the firework issue and brightening colors
-- [ ]   Adaptably Zooming in: When pressing full screen on Diagnostics file, will fill screen 
+- [x]   Improving Pixel Capture: Fixing the firework issue and brightening colors
+- [x]   Adaptably Zooming in: When pressing full screen on Diagnostics file, will fill screen
+- [ ]   Resolition Enhancing: Increase resolution of the fullscreen, currently a bit pixelated
 - [ ]   Raspberry Pi compatability: A Raspberry Pi can run the program rather than be stuck to your computer
   
 ## Installation Guide
@@ -33,6 +34,7 @@ Gif will be added along with a youtube video
 
 ## Known issues
 
-- My HDMI splitter won't accept input from the Nintendo Switch 2, this is likely from the anti-piracy software forbidding it
-- Zooming into the Ambilight Command Center window will not adjust the window to the monitor
-- Fireworks and other changes to the screen that aren't big enough to resgister to the border aren't put on the LEDs
+- My HDMI splitter won't accept input from the Nintendo Switch 2, this is likely from the anti-piracy software forbidding it (NOTE: Using the firestick will however allow everything on there to still show)
+- ~~Zooming into the Ambilight Command Center window will not adjust the window to the monitor~~
+- ~~Fireworks and other changes to the screen that aren't big enough to resgister to the border aren't put on the LEDs~~
+- Pressing only 'q' is unintuitive, I'll add escape to also kill the program, an 'L' button to toggle the pixels/LEDs on the borders and 'F' to stop zooming in.
