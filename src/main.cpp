@@ -1,6 +1,12 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 
+// Explaining these since they aren't too common
+
+#include <thread> // Allows the program to run two different tasks at the same time
+#include <atomic> // Prevents data corruption 
+#include <mutex>  // Compliment to thread, makes sure that the 'threads' don't interact
+
 #include "../include/helper.h"
 
 /*
@@ -54,6 +60,30 @@
  * 
  */
 
+ std::atomic<bool> inMotion(true); // Determines if it's safe to change/access variables
+ cv::Mat sharedFrame; // communication of main program and capture thread to access/update each other
+ std::mutex mutexFrame; // keeps sharedFrame from getting corrupted
+
+ void captureThread(cv::VideoCapture* cap){ // Reduces delay in processing
+
+    cv::Mat tempFrame; // Keeps a copy of the frame in case the original is changed 
+
+    // While not being used by the other processor get a copy of the frame safely 
+
+    while(inMotion){ 
+
+        if(cap -> grab()){
+            cap->retrieve(tempFrame);
+            if(!tempFrame.empty()){
+                std::lock_guard<std::mutex> lock(mutexFrame);
+                tempFrame.copyTo(sharedFrame);
+            }
+        }
+
+    }
+
+ }
+
 int main(){
 
     int screenWidth  = 0;
@@ -70,6 +100,9 @@ int main(){
         capture.open(i, cv::CAP_DSHOW);
 
         if(capture.isOpened()){
+            capture.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
+            capture.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
+            capture.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
             cv::Mat testScreen;
             capture >> testScreen;
             
@@ -84,39 +117,48 @@ int main(){
         return -1;
     }
 
-        // Sets up the dashboard once so doesn't need to keep being recreated
+    // Sets up the dashboard once so doesn't need to keep being recreated
 
-        capture >> screen;
+    capture >> screen;
 
-        // One master window will open with four sides of 'lights' surrounding it //
-        // Here will be only the 'lights' which will border the main display
-        int width = screen.cols;
-        int height = screen.rows;
+    // One master window will open with four sides of 'lights' surrounding it //
+    // Here will be only the 'lights' which will border the main display
+    int width = screen.cols;
+    int height = screen.rows;
 
-        // Divided number for both determines how many squares in that section
+    // Divided number for both determines how many squares in that section
 
-        int subwidth = width / 32;      
-        int subheight = height / 32;    
+    int subwidth = width / 32;      
+    int subheight = height / 32;    
 
-        int lightSize = 40; // Size of each individual 'light'
+    int lightSize = 40; // Size of each individual 'light'
 
-        // This is the entire screen (non zoomed in)
-        cv::Mat dashboard(height + (lightSize * 2), 
-                          width + (lightSize * 2), 
-                          CV_8UC3, 
-                          cv::Scalar(0,0,0));
+    // This is the entire screen (non zoomed in)
+    cv::Mat dashboard(height + (lightSize * 2), 
+                        width + (lightSize * 2), 
+                        CV_8UC3, 
+                        cv::Scalar(0,0,0));
 
-        // The process of creating a window that full screens
-        // create the name, have the window open, set the window to its size, have the window created
-        std::string windowName = "Ambilight Command Center";
-        cv::namedWindow(windowName, cv::WINDOW_NORMAL);
-        cv::setWindowProperty(windowName, cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
-        cv::Mat fullScreen;
+    // The process of creating a window that full screens
+    // create the name, have the window open, set the window to its size, have the window created
+    std::string windowName = "Ambilight Command Center";
+    cv::namedWindow(windowName, cv::WINDOW_NORMAL);
+    cv::setWindowProperty(windowName, cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
 
+    cv::Mat fullScreen; // For display to user
+    cv::Mat reducedScreen; // Used to calculate the border pixels
+
+    std::thread backgroundProcess(captureThread, &capture);
 
     while(1){ // Loop for video display
 
-        capture >> screen; // Grab current display 
+        {
+            std::lock_guard<std::mutex> lock(mutexFrame); // Ensure no changes while grabbing
+            if(!sharedFrame.empty()){ // If frame exists, use it
+                sharedFrame.copyTo(screen);
+            }
+        }
+
         if(screen.empty()){             
             std::cerr << "Video Capture did not grab what was on the screen";
             break;                   
@@ -124,6 +166,7 @@ int main(){
 
         //  That main display is added here overlapping the border
 
+        
         screen.copyTo(dashboard(cv::Rect(lightSize,lightSize,width,height)));
 
 
@@ -154,19 +197,24 @@ int main(){
             dashboard(cv::Rect(lightSize + (subwidth * i), height + lightSize, currentW, lightSize)).setTo(getVibrantMean(bottomSlice)); // Bottom
         }
 
-        cv::resize(dashboard, fullScreen, cv::Size(screenWidth, screenHeight), 0, 0, cv::INTER_NEAREST);
+        cv::resize(dashboard, fullScreen, cv::Size(screenWidth, screenHeight), 0, 0, cv::INTER_LINEAR);
 
         cv::imshow("Ambilight Command Center", fullScreen);
 
         // Press q to escape
 
-        if (cv::waitKey(2) == 'q'){
+        if (cv::waitKey(1) == 'q'){
             break;
         }
 
     }
 
     // When escaped, stop recording, kill windows, and exit program
+
+    inMotion = false;
+    if(backgroundProcess.joinable()){ // If task is running, pause it
+        backgroundProcess.join();
+    }
 
     capture.release();
     cv::destroyAllWindows();
