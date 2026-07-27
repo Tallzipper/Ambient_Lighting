@@ -1,8 +1,6 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 
-// Explaining these since they aren't too common
-
 #include <thread> // Allows the program to run two different tasks at the same time
 #include <atomic> // Prevents data corruption 
 #include <mutex>  // Compliment to thread, makes sure that the 'threads' don't interact
@@ -159,7 +157,6 @@ int main(){
     int compressedHeight = 180;
     int compressedSubwidth = compressedWidth / 32;
     int compressedSubheight = compressedHeight / 32;
-    int compressedEdge = 10;
 
     while(1){ // Loop for video display
 
@@ -170,6 +167,10 @@ int main(){
             }
         }
         cv::resize(screen, compressedScreen, cv::Size(compressedWidth, compressedHeight), 0, 0, cv::INTER_NEAREST);
+
+        // calculates the compressed edge so it better fits the screen
+        int compressedEdge = edgePixels * compressedScreen.cols / width;
+        if(compressedEdge < 1) compressedEdge = 1; // Guard
 
 
         if(screen.empty()){             
@@ -188,23 +189,31 @@ int main(){
         for(int i = 0; i < 32; i++){ //  32 for each side
 
             int currentW = subwidth;
-            int currentH = subheight;
 
             int compressedCurrentW = compressedSubwidth; // These names are getting too long
             int compressedCurrentH = compressedSubheight;
 
             if(i == 31){
                 currentW = width - (subwidth * i);
-                currentH = height - (subheight * i);
 
                 compressedCurrentW = compressedWidth - (compressedSubwidth * i);
                 compressedCurrentH = compressedHeight - (compressedSubheight * i);
             } 
 
+            // Height callibration
+
+            int y_start  = (height * i) / 32;
+            int y_end    = (height * (i + 1)) / 32;
+            int currentH = y_end - y_start;
+
+            int comp_y_start = (compressedHeight * i) / 32;
+            int comp_y_end   = (compressedHeight * (i + 1)) / 32;
+            int compH        = comp_y_end - comp_y_start;      
+
             // Get the colors of the section of the screen
 
-            cv::Mat leftSlice   = compressedScreen(cv::Rect(0, compressedSubheight * i, compressedEdge, compressedCurrentH));
-            cv::Mat rightSlice  = compressedScreen(cv::Rect(compressedWidth - compressedEdge, compressedSubheight * i, compressedEdge, compressedCurrentH));
+            cv::Mat leftSlice  = compressedScreen(cv::Rect(0, comp_y_start, compressedEdge, compH));
+            cv::Mat rightSlice = compressedScreen(cv::Rect(compressedWidth - compressedEdge, comp_y_start, compressedEdge, compH));
             cv::Mat topSlice    = compressedScreen(cv::Rect(compressedSubwidth * i, 0, compressedCurrentW, compressedEdge));
             cv::Mat bottomSlice = compressedScreen(cv::Rect(compressedSubwidth * i, compressedHeight - compressedEdge, compressedCurrentW, compressedEdge));
 
