@@ -84,6 +84,8 @@
 
 int main(){
 
+    bool borders = true; // Determines whether the LEDs on the border is shown or not
+
     int screenWidth  = 0;
     int screenHeight = 0;
 
@@ -178,61 +180,71 @@ int main(){
             break;                   
         }
 
-        //  That main display is added here overlapping the border
+        if(borders){ // Show border
+            dashboard.setTo(cv::Scalar(0, 0, 0)); // Clear canvas
+            
+            //  That main display is added here overlapping the border
+            screen.copyTo(dashboard(cv::Rect(lightSize,lightSize,width,height)));
 
-        
-        screen.copyTo(dashboard(cv::Rect(lightSize,lightSize,width,height)));
+            // The loop here will serve to create each of the lights for the display
 
+            for(int i = 0; i < 32; i++){ //  32 for each side
 
-        // The loop here will serve to create each of the lights for the display
+                int currentW = subwidth;
 
-        for(int i = 0; i < 32; i++){ //  32 for each side
+                int compressedCurrentW = compressedSubwidth; // These names are getting too long
+                int compressedCurrentH = compressedSubheight;
 
-            int currentW = subwidth;
+                if(i == 31){
+                    currentW = width - (subwidth * i);
 
-            int compressedCurrentW = compressedSubwidth; // These names are getting too long
-            int compressedCurrentH = compressedSubheight;
+                    compressedCurrentW = compressedWidth - (compressedSubwidth * i);
+                    compressedCurrentH = compressedHeight - (compressedSubheight * i);
+                } 
 
-            if(i == 31){
-                currentW = width - (subwidth * i);
+                // Height callibration
 
-                compressedCurrentW = compressedWidth - (compressedSubwidth * i);
-                compressedCurrentH = compressedHeight - (compressedSubheight * i);
-            } 
+                int y_start  = (height * i) / 32;
+                int y_end    = (height * (i + 1)) / 32;
+                int currentH = y_end - y_start;
 
-            // Height callibration
+                int comp_y_start = (compressedHeight * i) / 32;
+                int comp_y_end   = (compressedHeight * (i + 1)) / 32;
+                int compH        = comp_y_end - comp_y_start;      
 
-            int y_start  = (height * i) / 32;
-            int y_end    = (height * (i + 1)) / 32;
-            int currentH = y_end - y_start;
+                // Get the colors of the section of the screen
 
-            int comp_y_start = (compressedHeight * i) / 32;
-            int comp_y_end   = (compressedHeight * (i + 1)) / 32;
-            int compH        = comp_y_end - comp_y_start;      
+                cv::Mat leftSlice   = compressedScreen(cv::Rect(0, comp_y_start, compressedEdge, compH));
+                cv::Mat rightSlice  = compressedScreen(cv::Rect(compressedWidth - compressedEdge, comp_y_start, compressedEdge, compH));
+                cv::Mat topSlice    = compressedScreen(cv::Rect(compressedSubwidth * i, 0, compressedCurrentW, compressedEdge));
+                cv::Mat bottomSlice = compressedScreen(cv::Rect(compressedSubwidth * i, compressedHeight - compressedEdge, compressedCurrentW, compressedEdge));
 
-            // Get the colors of the section of the screen
+                // Place each of the colors onto the lights they belong to
 
-            cv::Mat leftSlice  = compressedScreen(cv::Rect(0, comp_y_start, compressedEdge, compH));
-            cv::Mat rightSlice = compressedScreen(cv::Rect(compressedWidth - compressedEdge, comp_y_start, compressedEdge, compH));
-            cv::Mat topSlice    = compressedScreen(cv::Rect(compressedSubwidth * i, 0, compressedCurrentW, compressedEdge));
-            cv::Mat bottomSlice = compressedScreen(cv::Rect(compressedSubwidth * i, compressedHeight - compressedEdge, compressedCurrentW, compressedEdge));
+                dashboard(cv::Rect(0, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(leftSlice)); // Left
+                dashboard(cv::Rect(width + lightSize, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(rightSlice)); // Right
+                dashboard(cv::Rect(lightSize + (subwidth * i), 0, currentW, lightSize)).setTo(getVibrantMean(topSlice)); // Top
+                dashboard(cv::Rect(lightSize + (subwidth * i), height + lightSize, currentW, lightSize)).setTo(getVibrantMean(bottomSlice)); // Bottom
+            }
 
-            // Place each of the colors onto the lights they belong to
-
-            dashboard(cv::Rect(0, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(leftSlice)); // Left
-            dashboard(cv::Rect(width + lightSize, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(rightSlice)); // Right
-            dashboard(cv::Rect(lightSize + (subwidth * i), 0, currentW, lightSize)).setTo(getVibrantMean(topSlice)); // Top
-            dashboard(cv::Rect(lightSize + (subwidth * i), height + lightSize, currentW, lightSize)).setTo(getVibrantMean(bottomSlice)); // Bottom
+            cv::resize(dashboard, fullScreen, cv::Size(screenWidth, screenHeight), 0, 0, cv::INTER_LINEAR);
         }
-
-        cv::resize(dashboard, fullScreen, cv::Size(screenWidth, screenHeight), 0, 0, cv::INTER_LINEAR);
+        else{ // No pixels showing
+            cv::resize(screen, fullScreen, cv::Size(screenWidth, screenHeight), 0, 0, cv::INTER_LINEAR);
+        }
 
         cv::imshow("Ambilight Command Center", fullScreen);
 
         // Press q to escape
 
-        if (cv::waitKey(1) == 'q'){
+        int waitKey = cv::waitKey(1);
+
+        if (waitKey == 'q' || waitKey == 'Q'){
             break;
+        }
+        else if(waitKey == 27){
+            borders = !borders;
+
         }
 
     }
