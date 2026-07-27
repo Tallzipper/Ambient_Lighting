@@ -100,8 +100,8 @@ int main(){
         capture.open(i, cv::CAP_DSHOW);
 
         if(capture.isOpened()){
-            capture.set(cv::CAP_PROP_FRAME_WIDTH, 1280); // This has a faster frame rate at cost to quality
-            capture.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
+            capture.set(cv::CAP_PROP_FRAME_WIDTH, 1920); // This has a faster frame rate at cost to quality
+            capture.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
             capture.set(cv::CAP_PROP_FPS, 60);
             capture.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
             capture.set(cv::CAP_PROP_BUFFERSIZE, 1); // Copied frames removed
@@ -128,16 +128,19 @@ int main(){
     int width = screen.cols;
     int height = screen.rows;
 
-    // Divided number for both determines how many squares in that section
-
-    int subwidth = width / 32;      
-    int subheight = height / 32;    
-
     int lightSize = 40; // Size of each individual 'light'
 
+    // for the inside of the LED frame
+    int innerWidth = screenWidth - (lightSize * 2);
+    int innerHeight = screenHeight - (lightSize * 2);
+
+    // Divided number for both determines how many squares in that section
+    int subwidth = innerWidth / 32;      
+    int subheight = innerHeight / 32;   
+
     // This is the entire screen (non zoomed in)
-    cv::Mat dashboard(height + (lightSize * 2), 
-                        width + (lightSize * 2), 
+    cv::Mat dashboard(  screenHeight, 
+                        screenWidth, 
                         CV_8UC3, 
                         cv::Scalar(0,0,0));
 
@@ -160,6 +163,9 @@ int main(){
     int compressedSubwidth = compressedWidth / 32;
     int compressedSubheight = compressedHeight / 32;
 
+    // Inside of the LED frame's feed
+    cv::Mat innerDisplay;
+
     while(1){ // Loop for video display
 
         {
@@ -168,7 +174,10 @@ int main(){
                 sharedFrame.copyTo(screen);
             }
         }
-        cv::resize(screen, compressedScreen, cv::Size(compressedWidth, compressedHeight), 0, 0, cv::INTER_NEAREST);
+        
+        // Makes the quality of the display better
+        cv::resize(screen, compressedScreen, cv::Size(compressedWidth, compressedHeight), 0, 0, cv::INTER_LINEAR);
+        cv::GaussianBlur(compressedScreen, compressedScreen, cv::Size(5, 5), 0);
 
         // calculates the compressed edge so it better fits the screen
         int compressedEdge = edgePixels * compressedScreen.cols / width;
@@ -181,10 +190,12 @@ int main(){
         }
 
         if(borders){ // Show border
+
             dashboard.setTo(cv::Scalar(0, 0, 0)); // Clear canvas
             
-            //  That main display is added here overlapping the border
-            screen.copyTo(dashboard(cv::Rect(lightSize,lightSize,width,height)));
+            // That main display is added here within the border
+            cv::resize(screen, innerDisplay, cv::Size(innerWidth, innerHeight));
+            innerDisplay.copyTo(dashboard(cv::Rect(lightSize, lightSize, innerWidth, innerHeight)));
 
             // The loop here will serve to create each of the lights for the display
 
@@ -195,8 +206,9 @@ int main(){
                 int compressedCurrentW = compressedSubwidth; // These names are getting too long
                 int compressedCurrentH = compressedSubheight;
 
+                // Edge case
                 if(i == 31){
-                    currentW = width - (subwidth * i);
+                    currentW = innerWidth - (subwidth * i);
 
                     compressedCurrentW = compressedWidth - (compressedSubwidth * i);
                     compressedCurrentH = compressedHeight - (compressedSubheight * i);
@@ -204,14 +216,20 @@ int main(){
 
                 // Height callibration
 
-                int y_start  = (height * i) / 32;
-                int y_end    = (height * (i + 1)) / 32;
-                int currentH = y_end - y_start;
+                int currentH = 0;
+                int compH = 0;
 
-                int comp_y_start = (compressedHeight * i) / 32;
-                int comp_y_end   = (compressedHeight * (i + 1)) / 32;
-                int compH        = comp_y_end - comp_y_start;      
+                if(i == 31){
+                    currentH = innerHeight - (subheight * i);
+                    compH = compressedHeight - (compressedSubheight * i);
+                }
+                else{
+                    currentH = subheight;
+                    compH = compressedSubheight;
+                }
 
+                int comp_y_start = compressedSubheight * i;
+                
                 // Get the colors of the section of the screen
 
                 cv::Mat leftSlice   = compressedScreen(cv::Rect(0, comp_y_start, compressedEdge, compH));
@@ -222,18 +240,18 @@ int main(){
                 // Place each of the colors onto the lights they belong to
 
                 dashboard(cv::Rect(0, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(leftSlice)); // Left
-                dashboard(cv::Rect(width + lightSize, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(rightSlice)); // Right
+                dashboard(cv::Rect(screenWidth - lightSize, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(rightSlice)); // Right
                 dashboard(cv::Rect(lightSize + (subwidth * i), 0, currentW, lightSize)).setTo(getVibrantMean(topSlice)); // Top
-                dashboard(cv::Rect(lightSize + (subwidth * i), height + lightSize, currentW, lightSize)).setTo(getVibrantMean(bottomSlice)); // Bottom
+                dashboard(cv::Rect(lightSize + (subwidth * i), screenHeight - lightSize, currentW, lightSize)).setTo(getVibrantMean(bottomSlice)); // Bottom
             }
 
-            cv::resize(dashboard, fullScreen, cv::Size(screenWidth, screenHeight), 0, 0, cv::INTER_LINEAR);
+            cv::imshow("Ambilight Command Center", dashboard);
         }
         else{ // No pixels showing
-            cv::resize(screen, fullScreen, cv::Size(screenWidth, screenHeight), 0, 0, cv::INTER_LINEAR);
+            cv::Mat rawScaled;
+            cv::resize(screen, rawScaled, cv::Size(screenWidth, screenHeight));
+            cv::imshow("Ambilight Command Center", rawScaled);
         }
-
-        cv::imshow("Ambilight Command Center", fullScreen);
 
         // Press q to escape
 
