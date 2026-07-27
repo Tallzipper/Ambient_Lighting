@@ -100,9 +100,11 @@ int main(){
         capture.open(i, cv::CAP_DSHOW);
 
         if(capture.isOpened()){
-            capture.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
-            capture.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
+            capture.set(cv::CAP_PROP_FRAME_WIDTH, 1280); // This has a faster frame rate at cost to quality
+            capture.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
+            capture.set(cv::CAP_PROP_FPS, 60);
             capture.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+            capture.set(cv::CAP_PROP_BUFFERSIZE, 1); // Copied frames removed
             cv::Mat testScreen;
             capture >> testScreen;
             
@@ -146,9 +148,18 @@ int main(){
     cv::setWindowProperty(windowName, cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
 
     cv::Mat fullScreen; // For display to user
-    cv::Mat reducedScreen; // Used to calculate the border pixels
 
     std::thread backgroundProcess(captureThread, &capture);
+
+    // Downscaling to make easier to calculate border pixels
+    cv::Mat compressedScreen;
+
+    // 320 x 180 compression at 10 x 5 pixels reaching 10 pixels in
+    int compressedWidth  = 320;
+    int compressedHeight = 180;
+    int compressedSubwidth = compressedWidth / 32;
+    int compressedSubheight = compressedHeight / 32;
+    int compressedEdge = 10;
 
     while(1){ // Loop for video display
 
@@ -158,6 +169,8 @@ int main(){
                 sharedFrame.copyTo(screen);
             }
         }
+        cv::resize(screen, compressedScreen, cv::Size(compressedWidth, compressedHeight), 0, 0, cv::INTER_NEAREST);
+
 
         if(screen.empty()){             
             std::cerr << "Video Capture did not grab what was on the screen";
@@ -177,17 +190,23 @@ int main(){
             int currentW = subwidth;
             int currentH = subheight;
 
+            int compressedCurrentW = compressedSubwidth; // These names are getting too long
+            int compressedCurrentH = compressedSubheight;
+
             if(i == 31){
                 currentW = width - (subwidth * i);
                 currentH = height - (subheight * i);
+
+                compressedCurrentW = compressedWidth - (compressedSubwidth * i);
+                compressedCurrentH = compressedHeight - (compressedSubheight * i);
             } 
 
             // Get the colors of the section of the screen
 
-            cv::Mat leftSlice   = screen(cv::Rect(0, subheight * i, edgePixels, currentH));
-            cv::Mat rightSlice  = screen(cv::Rect(width - edgePixels, subheight * i, edgePixels, currentH));
-            cv::Mat topSlice    = screen(cv::Rect(subwidth * i, 0, currentW, edgePixels));
-            cv::Mat bottomSlice = screen(cv::Rect(subwidth * i, height - edgePixels, currentW, edgePixels));
+            cv::Mat leftSlice   = compressedScreen(cv::Rect(0, compressedSubheight * i, compressedEdge, compressedCurrentH));
+            cv::Mat rightSlice  = compressedScreen(cv::Rect(compressedWidth - compressedEdge, compressedSubheight * i, compressedEdge, compressedCurrentH));
+            cv::Mat topSlice    = compressedScreen(cv::Rect(compressedSubwidth * i, 0, compressedCurrentW, compressedEdge));
+            cv::Mat bottomSlice = compressedScreen(cv::Rect(compressedSubwidth * i, compressedHeight - compressedEdge, compressedCurrentW, compressedEdge));
 
             // Place each of the colors onto the lights they belong to
 
