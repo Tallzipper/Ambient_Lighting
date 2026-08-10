@@ -1,9 +1,14 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 
+#include <algorithm> // Meant for min and max functions
+#include <cmath>
+
 #include <thread> // Allows the program to run two different tasks at the same time
 #include <atomic> // Prevents data corruption 
 #include <mutex>  // Compliment to thread, makes sure that the 'threads' don't interact
+
+#include <windows.h>
 
 #include "../include/helper.h"
 
@@ -82,7 +87,112 @@
 
  }
 
+    // https://aticleworld.com/serial-port-programming-using-win32-api/
+    // Windows Datatypes to note, for self
+        // CreateFileA()- Opens a com port
+        // DWORD        - Window's version of unsigned long
+        // DCB          - Manipulates the open COM port
+        // HANDLE       - For the file to be accessed with copiable attributes
+        // Commitimeouts- 
+
+    // Initializes the port for the ESP32 which tells the lights how to act. 
+HANDLE initSerial(const char* portName, DWORD baudRate) { 
+
+    // Opens COM port device to read and write to
+    HANDLE hComm = CreateFileA(
+        portName, 
+        GENERIC_READ | GENERIC_WRITE, 
+        0, 
+        NULL,
+        OPEN_EXISTING, 
+        0, 
+        NULL
+    );
+    
+    if (hComm == INVALID_HANDLE_VALUE) { // For when the port isn't able to be opened
+        std::cerr << "Could not open " << portName << std::endl;
+        return INVALID_HANDLE_VALUE; // Doesn't work with exceptions. This is windows based.
+    }
+
+    // Manipulates UART settings
+    DCB dcbSerialParams = { 0 };
+    dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
+
+    if (!GetCommState(hComm, &dcbSerialParams)) { // Opened but unusable not responding
+        CloseHandle(hComm);
+        return INVALID_HANDLE_VALUE; 
+    }
+
+
+    dcbSerialParams.BaudRate = baudRate;
+
+    dcbSerialParams.ByteSize = 8;           // Payload used by Uart
+    dcbSerialParams.StopBits = ONESTOPBIT;  // End of byte uses 1 to signal finish 
+    dcbSerialParams.Parity   = NOPARITY;    // Removes parity system to increase speed + better system in place
+
+    if (!SetCommState(hComm, &dcbSerialParams)) { // If baudrate/byte size failed
+        CloseHandle(hComm);
+        return INVALID_HANDLE_VALUE;
+    }
+
+    // Prioritizes speed by returning immediately any available bytes
+    COMMTIMEOUTS timeouts = { 0 };
+    timeouts.ReadIntervalTimeout         = MAXDWORD; 
+    timeouts.ReadTotalTimeoutConstant    = 0;
+    timeouts.ReadTotalTimeoutMultiplier  = 0;
+    timeouts.WriteTotalTimeoutConstant   = 0;
+    timeouts.WriteTotalTimeoutMultiplier = 0;
+
+    if (!SetCommTimeouts(hComm, &timeouts)) { // In case hardware fails during initialization
+        CloseHandle(hComm);
+        return INVALID_HANDLE_VALUE;
+    }
+
+    return hComm;
+}
+
+// Formats LED colors into the Adalight frame and pushes to serial
+void sendAdalightData(HANDLE hComm, const std::vector<cv::Vec3b>& leds) {
+    if (hComm == INVALID_HANDLE_VALUE) return; // Ensures your hardware is still connected 
+
+    uint16_t count = static_cast<uint16_t>(leds.size()); // gets LEDs to be read by 'framebuff'
+    
+    uint8_t topHalf  = (count - 1) >> 8;        // 00000000XXXXXXXX
+    uint8_t bottomHalf  = (count - 1) & 0xFF;   // XXXXXXXX00000000
+    uint8_t check = topHalf ^ bottomHalf ^ 0x55;  // checks for corruption
+
+    std::vector<uint8_t> frameBuffer;
+    frameBuffer.reserve(6 + count * 3);
+
+    // 6-Byte Header framing
+    frameBuffer.push_back('A');         //[0] R
+    frameBuffer.push_back('d');         //[1] G
+    frameBuffer.push_back('a');         //[2] B
+    frameBuffer.push_back(topHalf);     //[3] top and bottom are LED count
+    frameBuffer.push_back(bottomHalf);  //[4]
+    frameBuffer.push_back(check);       //[5] checks the lights validity later, better drop than flash random color
+
+    // Converts OpenCV BGR to Adalight's RGB Order
+    for (const auto& color : leds) {
+        frameBuffer.push_back(color[2]); // Red
+        frameBuffer.push_back(color[1]); // Green
+        frameBuffer.push_back(color[0]); // Blue
+    }
+
+    DWORD bytesWritten;
+    
+    WriteFile(hComm, frameBuffer.data(), static_cast<DWORD>(frameBuffer.size()), &bytesWritten, NULL); // Sends the data over
+}
+
 int main(){
+
+    HANDLE hSerial = initSerial("\\\\.\\COM6", 115200);
+
+    if (hSerial == INVALID_HANDLE_VALUE) {
+        std::cerr << "Continuing without physical LED output." << std::endl;
+    } else {
+        std::cout << "Connected to ESP32" << std::endl;
+    }
 
     bool borders = true; // Determines whether the LEDs on the border is shown or not
 
@@ -96,7 +206,7 @@ int main(){
 
     int edgePixels = 60; // Amount of screen the edge peers into
 
-    for(int i = 1; i <= 2; i++){ // Trying indices to see which is the video capture
+    for(int i = 0; i <= 2; i++){ // Trying indices to see which is the video capture
         capture.open(i, cv::CAP_DSHOW);
 
         if(capture.isOpened()){
@@ -166,6 +276,8 @@ int main(){
     // Inside of the LED frame's feed
     cv::Mat innerDisplay;
 
+    std::vector<cv::Vec3b> adalightPayload(75, cv::Vec3b(0, 0, 0)); // FIX Hardcoded for my system. Will make const
+
     while(1){ // Loop for video display
 
         {
@@ -196,6 +308,9 @@ int main(){
             // That main display is added here within the border
             cv::resize(screen, innerDisplay, cv::Size(innerWidth, innerHeight));
             innerDisplay.copyTo(dashboard(cv::Rect(lightSize, lightSize, innerWidth, innerHeight)));
+
+            // Store edge slice colors to map onto physical 75 LEDs
+            std::vector<cv::Vec3b> leftSlices(32), topSlices(32), rightSlices(32), bottomSlices(32);
 
             // The loop here will serve to create each of the lights for the display
 
@@ -237,13 +352,64 @@ int main(){
                 cv::Mat topSlice    = compressedScreen(cv::Rect(compressedSubwidth * i, 0, compressedCurrentW, compressedEdge));
                 cv::Mat bottomSlice = compressedScreen(cv::Rect(compressedSubwidth * i, compressedHeight - compressedEdge, compressedCurrentW, compressedEdge));
 
+                cv::Scalar sLeft   = getVibrantMean(leftSlice);
+                cv::Scalar sRight  = getVibrantMean(rightSlice);
+                cv::Scalar sTop    = getVibrantMean(topSlice);
+                cv::Scalar sBottom = getVibrantMean(bottomSlice);
+
+                cv::Vec3b cLeft(  static_cast<uchar>(sLeft[0]),   static_cast<uchar>(sLeft[1]),   static_cast<uchar>(sLeft[2]));
+                cv::Vec3b cRight( static_cast<uchar>(sRight[0]),  static_cast<uchar>(sRight[1]),  static_cast<uchar>(sRight[2]));
+                cv::Vec3b cTop(    static_cast<uchar>(sTop[0]),    static_cast<uchar>(sTop[1]),    static_cast<uchar>(sTop[2]));
+                cv::Vec3b cBottom( static_cast<uchar>(sBottom[0]), static_cast<uchar>(sBottom[1]), static_cast<uchar>(sBottom[2]));
+
+                // Store slice colors for 75-LED mapping
+                leftSlices[i]   = cLeft;
+                rightSlices[i]  = cRight;
+                topSlices[i]    = cTop;
+                bottomSlices[i] = cBottom;
+
                 // Place each of the colors onto the lights they belong to
 
-                dashboard(cv::Rect(0, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(leftSlice)); // Left
-                dashboard(cv::Rect(screenWidth - lightSize, lightSize + (subheight * i), lightSize, currentH)).setTo(getVibrantMean(rightSlice)); // Right
-                dashboard(cv::Rect(lightSize + (subwidth * i), 0, currentW, lightSize)).setTo(getVibrantMean(topSlice)); // Top
-                dashboard(cv::Rect(lightSize + (subwidth * i), screenHeight - lightSize, currentW, lightSize)).setTo(getVibrantMean(bottomSlice)); // Bottom
+                dashboard(cv::Rect(0, lightSize + (subheight * i), lightSize, currentH)).setTo(cLeft); // Left
+                dashboard(cv::Rect(screenWidth - lightSize, lightSize + (subheight * i), lightSize, currentH)).setTo(cRight); // Right
+                dashboard(cv::Rect(lightSize + (subwidth * i), 0, currentW, lightSize)).setTo(cTop); // Top
+                dashboard(cv::Rect(lightSize + (subwidth * i), screenHeight - lightSize, currentW, lightSize)).setTo(cBottom); // Bottom
             }
+            
+            // Clear entire array first (ensures skipped LEDs 0-4, 14-18, 38-42, 51-56 stay off)
+            std::fill(adalightPayload.begin(), adalightPayload.end(), cv::Vec3b(0, 0, 0));
+
+            // ONLY WORKS ON MY COMPUTER.
+
+            // Segment 0 (Right Edge): LEDs 5 – 13 (9 LEDs, Bottom -> Top)
+            for (int k = 0; k < 9; ++k) {
+                float rawIdx = (8.0f - k) * 31.0f / 8.0f;
+                int idx = min(31, max(0, static_cast<int>(std::round(rawIdx))));
+                adalightPayload[5 + k] = rightSlices[idx];
+            }
+
+            // Segment 1 (Top Edge): LEDs 19 – 37 (19 LEDs, Right -> Left)
+            for (int k = 0; k < 19; ++k) {
+                float rawIdx = 31.0f - (k * 31.0f / 18.0f);
+                int idx = min(31, max(0, static_cast<int>(std::round(rawIdx))));
+                adalightPayload[19 + k] = topSlices[idx];
+            }
+
+            // Segment 2 (Left Edge): LEDs 43 – 50 (8 LEDs, Top -> Bottom)
+            for (int k = 0; k < 8; ++k) {
+                float rawIdx = k * 31.0f / 7.0f;
+                int idx = min(31, max(0, static_cast<int>(std::round(rawIdx))));
+                adalightPayload[43 + k] = leftSlices[idx];
+            }
+
+            // Segment 3 (Bottom Edge): LEDs 57 – 74 (18 LEDs, Left -> Right)
+            for (int k = 0; k < 18; ++k) {
+                float rawIdx = k * 31.0f / 17.0f;
+                int idx = min(31, max(0, static_cast<int>(std::round(rawIdx))));
+                adalightPayload[57 + k] = bottomSlices[idx];
+            }
+
+            sendAdalightData(hSerial, adalightPayload);
 
             cv::imshow("Ambilight Command Center", dashboard);
         }
@@ -253,7 +419,7 @@ int main(){
             cv::imshow("Ambilight Command Center", rawScaled);
         }
 
-        // Press q to escape
+        // Press q to escape and escape to toggle the borders
 
         int waitKey = cv::waitKey(1);
 
@@ -272,6 +438,10 @@ int main(){
     inMotion = false;
     if(backgroundProcess.joinable()){ // If task is running, pause it
         backgroundProcess.join();
+    }
+
+    if (hSerial != INVALID_HANDLE_VALUE) {
+        CloseHandle(hSerial);
     }
 
     capture.release();
