@@ -18,14 +18,17 @@ Gif will be added along with a youtube video
 - Video Capture Card, 4K USB3.0 HDMI to USB C, 1080P 60FPS
 - HDMI Splitter 4K@60Hz, HDMI Splitter 1 in 2 out
 - Two HDMI cables
+- Wires
+- Electrical Tape
+- 330 OHM Resistor
 
 ## Roadmap   
 
 - [x]   Diagnostics File: Shows what the LEDs would be picking up and tests your capture card, hdmi-splitter, and input device
-- [ ]   Main program: Using LEDs and ESP32 as an addion
+- [x]   Main program: Using LEDs and ESP32 as an addion
 - [x]   Improving Pixel Capture: Fixing the firework issue and brightening colors
 - [x]   Adaptably Zooming in: When pressing full screen on Diagnostics file, will fill screen
-- [ ]   Resolition Enhancing: Increase resolution of the fullscreen, currently a bit pixelated
+- [ ]   Not using a window and instead just focusing on the lights
 - [ ]   Raspberry Pi compatability: A Raspberry Pi can run the program rather than be stuck to your computer
   
 ## Installation Guide
@@ -38,3 +41,8 @@ Gif will be added along with a youtube video
 - ~~Zooming into the Ambilight Command Center window will not adjust the window to the monitor~~
 - ~~Fireworks and other changes to the screen that aren't big enough to resgister to the border aren't put on the LEDs~~
 - Pressing only 'q' is unintuitive, I'll add escape to also kill the program, an 'L' button to toggle the pixels/LEDs on the borders and 'F' to stop zooming in.
+- Only works for Windows
+
+## Authors note in progress
+
+- 8/9/2026: Over the last two weeks I have been going over this project as well as making the overall set-up safer. For one, a resistor is now used to not overload the LEDs. I'll also add a warning that this set-up currently only works for lights behind a monitor. You'll need shifters and a better AC/DC adaptor for this to work for anything much larger than that since it can be an electrical hazard. The system is currently only engineered to my screen. I'll be adding a .json file as well as a way of altering it in order to make it universal. The system also only works for windows api so I'll be changing that as well. The Raspberry pi implementation will take a backseat in favor of adding an installation guide which has been delayed due to it only working well on my device. This should be a lot smoother though since the project itself was the heavy lifting. 
