@@ -1,66 +1,66 @@
+#ifndef HELPER_H
+#define HELPER_H
+
 #include <opencv2/opencv.hpp>
-#include <iostream>
+#include <windows.h>
 
-cv::Scalar getVibrantMean(const cv::Mat& slice){
-
-    double totalWeight = 0;
-    double weightBlue = 0;
-    double weightRed = 0;
-    double weightGreen = 0;
-
-    // This will grab every relevant pixel for the calculation of the lights
-    for(int row = 0; row < slice.rows; row++){
-        const cv::Vec3b* pixel = slice.ptr<cv::Vec3b>(row); // Grabs a pixel
-
-        for(int col = 0; col < slice.cols; col++){ // Values in each pixel
-            unsigned char blue   = pixel[col][0];
-            unsigned char green  = pixel[col][1];
-            unsigned char red    = pixel[col][2];
-
-            double brightness = (0.2 * red + .7 * green + 0.1 * blue) / 255.0; // Lower the multipliers to get duller colors
-
-            unsigned char maxColor = std::max({red, green, blue});
-            unsigned char minColor = std::min({red, green, blue});
-
-            // Set as 0 in case pixel grabbed is entirely black
-            double saturation = 0;
-
-            if(maxColor > 0){
-               saturation = static_cast<double>(maxColor - minColor)/maxColor;
-            }
-
-            // determines intensity of the color
-            double weight = brightness * saturation * saturation * saturation + 0.01;
-
-            totalWeight = (weight) + totalWeight;
-
-            weightBlue  = (blue * weight) + weightBlue;
-            weightGreen = (green * weight) + weightGreen;
-            weightRed   = (red * weight) + weightRed;
-
-        }
-    }
-    if(totalWeight <= 0.01){ // Black since one of the values was 0
-        return cv::Scalar(0,0,0);
-    }
-    else{ // Intensity is calculated and returned for LED
-        return cv::Scalar(  weightBlue / totalWeight, 
-                            weightGreen/ totalWeight, 
-                            weightRed / totalWeight);
-    }
-
+// Gets the user's screen size
+inline void getScreenSize(int& width, int& height) {
+    width  = GetSystemMetrics(SM_CXSCREEN);
+    height = GetSystemMetrics(SM_CYSCREEN);
 }
 
-    void getScreenSize(int& width, int& height){ // Creates temp window to get screen resolution
+// Calculates the average color's brightness of an image slice
+inline cv::Scalar getVibrantMean(const cv::Mat& slice) {
+    if (slice.empty()) return cv::Scalar(0, 0, 0); // All black if no image
 
-        std::string windowName = "Screen Size Evaluator";
-        
-        cv::namedWindow(windowName, cv::WINDOW_NORMAL);
-        cv::setWindowProperty(windowName, cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
+    double totalWeight = 0;
+    double weightBlue  = 0;
+    double weightRed   = 0;
+    double weightGreen = 0;
 
-        cv::Rect screen = cv::getWindowImageRect(windowName);
-        width  = screen.width;
-        height = screen.height;
+    for (int row = 0; row < slice.rows; row++) {
+        const cv::Vec3b* pixel = slice.ptr<cv::Vec3b>(row); // gets each color's value per pixel
 
-        cv::destroyWindow(windowName);
+        for (int col = 0; col < slice.cols; col++) { // for every color distribute its weight
+            unsigned char blue  = pixel[col][0];
+            unsigned char green = pixel[col][1];
+            unsigned char red   = pixel[col][2];
+
+            // Reason for lights found on official OPENCV doccumentation. Green is most visible/important color
+            double brightness = (0.299 * red + 0.587 * green + 0.114 * blue) / 255.0;
+
+            // Doesn't work with std:: will check why later
+            unsigned char maxColor = max(red, max(green, blue));
+            unsigned char minColor = min(red, min(green, blue));
+
+            double saturation = 0;
+
+            if (maxColor > 0) {
+                saturation = static_cast<double>(maxColor - minColor) / maxColor;
+            }
+
+            // Forces brighter LEDs through saturation getting multiplied
+            double weight = brightness * saturation * saturation + 0.01; 
+
+            totalWeight += weight; // denominator to keep everything normalized
+
+            // Numerators of their weight in the image
+
+            weightBlue  += blue * weight;  
+            weightGreen += green * weight;
+            weightRed   += red * weight;
+        }
     }
+
+    if (totalWeight <= 0.01) { // guards division by 0
+        return cv::Scalar(0, 0, 0);
+    } 
+    else{ // Returns a vector of the three pixel's average per BGR color
+        return cv::Scalar(weightBlue  / totalWeight, 
+                          weightGreen / totalWeight, 
+                          weightRed   / totalWeight);
+    }
+}
+
+#endif // HELPER_H
