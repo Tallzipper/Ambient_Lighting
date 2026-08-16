@@ -106,11 +106,20 @@ void sendAdalightData(HANDLE hComm, const std::vector<cv::Vec3b>& leds) {
 
 
 // Initializes the port for the ESP32 which tells the lights how to act. 
-HANDLE initSerial(const char* portName, DWORD baudRate) { 
+HANDLE initSerial(const std::string& portName, DWORD baudRate) { 
+
+    std::string paths = portName;
+
+    // Fixes an error where the program would fail if the COM was above 10 since it 
+    //  isn't one of the hardcoded inputs into the system
+
+    if(paths.rfind("\\\\.\\", 0) != 0){ 
+        paths = "\\\\.\\" + portName;
+    }
 
     // Opens COM port device to read and write to
     HANDLE hComm = CreateFileA(
-        portName, 
+        paths.c_str(), 
         GENERIC_READ | GENERIC_WRITE, 
         0, 
         NULL,
@@ -156,6 +165,14 @@ HANDLE initSerial(const char* portName, DWORD baudRate) {
     if (!SetCommTimeouts(hComm, &timeouts)) { // In case hardware fails during initialization
         CloseHandle(hComm);
         return INVALID_HANDLE_VALUE;
+    }    
+
+    // Checks to see if opened or not
+
+    if (hComm == INVALID_HANDLE_VALUE) {
+        std::cerr << "Continuing without physical LED output." << std::endl;
+    } else {
+        std::cout << "Connected to ESP32" << std::endl;
     }
 
     return hComm;

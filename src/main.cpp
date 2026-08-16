@@ -67,11 +67,6 @@ int main(){
 
     HANDLE hSerial = initSerial("\\\\.\\COM6", 115200);
 
-    if (hSerial == INVALID_HANDLE_VALUE) {
-        std::cerr << "Continuing without physical LED output." << std::endl;
-    } else {
-        std::cout << "Connected to ESP32" << std::endl;
-    }
 
     bool borders = true; // Determines whether the LEDs on the border is shown or not
 
