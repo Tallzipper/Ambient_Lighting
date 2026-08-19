@@ -1,10 +1,10 @@
 # Ambient Lighting Sampling Engine
 
-## Intro
-
   This project will work to set up 'Ambient Lighting' to your TV or Monitor which immerses you in your media. With the use of internal based capture-software it removes the need of an external camera-capture based hardware which is visually obstructive at best or inaccurate at worst. The program directly reads the pixels on the border of your screen and relays this information to the LEDs placed behind your monitor. 
   
   The demo/diagnostics file has been completed fully functional and the main program will be updated once the remaining hardware arrives. 
+
+  ---
 
 ## Demonstration
 
