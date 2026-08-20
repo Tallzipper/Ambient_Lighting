@@ -1,3 +1,11 @@
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
+#include "../include/httplib.h" // yhirose's repository on creating a local http server
+
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "crypt32.lib")
+
 #include <opencv2/opencv.hpp>
 #include <iostream>
 
@@ -10,8 +18,7 @@
 
 #include <windows.h>
 
-#include "../include/helper.h"
-
+#include "../include/helper.h"  // Helper function to declutter main
 /*
  * How to use: 
  * 
@@ -63,16 +70,17 @@
  * 
  */
 
+// Global Variables -- Can't remove
+cv::Mat webFrame;
+std::mutex mutexWebFrame;
+
 int main(){
 
     HANDLE hSerial = initSerial("\\\\.\\COM6", 115200);
 
-
     bool borders = true; // Determines whether the LEDs on the border is shown or not
 
-    int screenWidth  = 0;
-    int screenHeight = 0;
-
+    int screenWidth = 0, screenHeight = 0;
     getScreenSize(screenWidth, screenHeight);
             
     cv::Mat screen; // For the image matrix to allocate LEDs
@@ -102,6 +110,17 @@ int main(){
         std::cerr << "Video Capture Hardware failed to initialize";
         return -1;
     }
+
+    httplib::Server svr;
+
+    svr.Get("/toggle-borders", [&](const httplib::Request&, httplib::Response& res) {
+        borders = !borders;
+        res.set_content(borders ? "Borders Enabled" : "Borders Disabled", "text/plain");
+    });
+
+    std::thread httpThread([&]() {
+        svr.listen("0.0.0.0", 8080); // Listens on port 8080
+    });
 
     // Sets up the dashboard once so doesn't need to keep being recreated
 
@@ -258,28 +277,28 @@ int main(){
             // Segment 0 (Right Edge): LEDs 5 – 13 (9 LEDs, Bottom -> Top)
             for (int k = 0; k < 9; ++k) {
                 float rawIdx = (8.0f - k) * 31.0f / 8.0f;
-                int idx = min(31, max(0, static_cast<int>(std::round(rawIdx))));
+                int idx = std::min(31, std::max(0, static_cast<int>(std::round(rawIdx))));
                 adalightPayload[5 + k] = rightSlices[idx];
             }
 
             // Segment 1 (Top Edge): LEDs 19 – 37 (19 LEDs, Right -> Left)
             for (int k = 0; k < 19; ++k) {
                 float rawIdx = 31.0f - (k * 31.0f / 18.0f);
-                int idx = min(31, max(0, static_cast<int>(std::round(rawIdx))));
+                int idx = std::min(31, std::max(0, static_cast<int>(std::round(rawIdx))));
                 adalightPayload[19 + k] = topSlices[idx];
             }
 
             // Segment 2 (Left Edge): LEDs 43 – 50 (8 LEDs, Top -> Bottom)
             for (int k = 0; k < 8; ++k) {
                 float rawIdx = k * 31.0f / 7.0f;
-                int idx = min(31, max(0, static_cast<int>(std::round(rawIdx))));
+                int idx = std::min(31, std::max(0, static_cast<int>(std::round(rawIdx))));
                 adalightPayload[43 + k] = leftSlices[idx];
             }
 
             // Segment 3 (Bottom Edge): LEDs 57 – 74 (18 LEDs, Left -> Right)
             for (int k = 0; k < 18; ++k) {
                 float rawIdx = k * 31.0f / 17.0f;
-                int idx = min(31, max(0, static_cast<int>(std::round(rawIdx))));
+                int idx = std::min(31, std::max(0, static_cast<int>(std::round(rawIdx))));
                 adalightPayload[57 + k] = bottomSlices[idx];
             }
 
@@ -316,6 +335,11 @@ int main(){
 
     if (hSerial != INVALID_HANDLE_VALUE) {
         CloseHandle(hSerial);
+    }
+
+    svr.stop();
+    if (httpThread.joinable()) {
+        httpThread.join();
     }
 
     capture.release();

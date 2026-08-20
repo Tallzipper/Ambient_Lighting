@@ -31,8 +31,8 @@ inline cv::Scalar getVibrantMean(const cv::Mat& slice) {
             double brightness = (0.299 * red + 0.587 * green + 0.114 * blue) / 255.0;
 
             // Doesn't work with std:: will check why later
-            unsigned char maxColor = max(red, max(green, blue));
-            unsigned char minColor = min(red, min(green, blue));
+            unsigned char maxColor = std::max(red, std::max(green, blue));
+            unsigned char minColor = std::min(red, std::min(green, blue));
 
             double saturation = 0;
 
