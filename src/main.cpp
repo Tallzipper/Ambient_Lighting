@@ -176,13 +176,12 @@ int main(){
         {
             std::lock_guard<std::mutex> lock(mutexFrame); // Ensure no changes while grabbing
             if(!sharedFrame.empty()){ // If frame exists, use it
-                sharedFrame.copyTo(screen);
+                std::swap(screen,sharedFrame);
             }
         }
         
         // Makes the quality of the display better
         cv::resize(screen, compressedScreen, cv::Size(compressedWidth, compressedHeight), 0, 0, cv::INTER_LINEAR);
-        cv::GaussianBlur(compressedScreen, compressedScreen, cv::Size(5, 5), 0);
 
         // calculates the compressed edge so it better fits the screen
         int compressedEdge = edgePixels * compressedScreen.cols / width;

@@ -19,10 +19,13 @@ inline cv::Scalar getVibrantMean(const cv::Mat& slice) {
     double weightRed   = 0;
     double weightGreen = 0;
 
-    for (int row = 0; row < slice.rows; row++) {
+    const int step = 2; // Reduces fps of colors to 30 fps in order to make picture go faster
+
+
+    for (int row = 0; row < slice.rows; row+= step) {
         const cv::Vec3b* pixel = slice.ptr<cv::Vec3b>(row); // gets each color's value per pixel
 
-        for (int col = 0; col < slice.cols; col++) { // for every color distribute its weight
+        for (int col = 0; col < slice.cols; col+= step) { // for every color distribute its weight
             unsigned char blue  = pixel[col][0];
             unsigned char green = pixel[col][1];
             unsigned char red   = pixel[col][2];
@@ -186,18 +189,20 @@ HANDLE initSerial(const std::string& portName, DWORD baudRate) {
 
  void captureThread(cv::VideoCapture* cap){ // Reduces delay in processing
 
-    cv::Mat tempFrame; // Keeps a copy of the frame in case the original is changed 
+    cv::Mat tempFrame; // Keeps a copy of the frame in case the original is changed  
 
-    // While not being used by the other processor get a copy of the frame safely 
+    // While not being used by the other processor swap the frame safely 
 
-    while(inMotion){ 
+    while(inMotion){
+        *cap >> tempFrame;
 
-        if(cap -> grab()){
-            cap->retrieve(tempFrame);
-            if(!tempFrame.empty()){
-                std::lock_guard<std::mutex> lock(mutexFrame);
-                tempFrame.copyTo(sharedFrame);
-            }
+        if(tempFrame.empty()){ // Don't run
+            continue; 
+        } 
+
+        {
+            std::lock_guard<std::mutex> lock(mutexFrame);
+            std::swap(sharedFrame, tempFrame);
         }
 
     }
