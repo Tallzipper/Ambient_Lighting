@@ -314,15 +314,31 @@ int main(){
 
         // Press q to escape and escape to toggle the borders
 
-        int waitKey = cv::waitKey(1);
+        cv::pollKey();
 
-        if (waitKey == 'q' || waitKey == 'Q'){
+        if((GetAsyncKeyState('Q') & 0x8000)) {
             break;
         }
-        else if(waitKey == 27){
-            borders = !borders;
 
+        // Auto will be used since very long data type name
+
+        static auto lastToggled = std::chrono::steady_clock::now(); // Get immediate time
+
+        if(GetAsyncKeyState(VK_ESCAPE) & 0x8000){ // escape, Toggle logic
+
+            auto now        = std::chrono::steady_clock::now(); // get current time
+
+            // Find time button's been held to not spam it;
+            auto elapsed    = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastToggled).count(); 
+
+            if (elapsed > 500){ // After 5 seconds will be able to switch again
+                borders = !borders;
+                lastToggled = now;
+            }
         }
+
+        while (cv::pollKey() != -1) {}
+
 
     }
 
