@@ -175,6 +175,8 @@ HANDLE initSerial(const std::string& portName, DWORD baudRate) {
         std::cout << "Connected to ESP32" << std::endl;
     }
 
+    PurgeComm(hComm, PURGE_RXCLEAR | PURGE_TXCLEAR | PURGE_RXABORT | PURGE_TXABORT);
+
     return hComm;
 }
 

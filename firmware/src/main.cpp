@@ -3,9 +3,9 @@
 
 #define LED_PIN         16      // GPIO 16 Data Pin
 #define NUM_LEDS        75      // LEDS on my machine
-#define BRIGHTNESS      60      // 
+#define BRIGHTNESS      128      // 
 
-#define SERIAL_BAUD     115200  // ESP32's baudrate
+#define SERIAL_BAUD     921600 // ESP32's baudrate
 #define PREFIX_SIZE     6       // Adalight control
 
 CRGB leds[NUM_LEDS];            // Allocates memory to hold the LED's light info

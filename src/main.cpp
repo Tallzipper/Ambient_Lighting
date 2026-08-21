@@ -76,7 +76,7 @@ std::mutex mutexWebFrame;
 
 int main(){
 
-    HANDLE hSerial = initSerial("\\\\.\\COM6", 115200);
+    HANDLE hSerial = initSerial("\\\\.\\COM6", 921600);
 
     bool borders = true; // Determines whether the LEDs on the border is shown or not
 
@@ -275,7 +275,7 @@ int main(){
             // ONLY WORKS ON MY COMPUTER.
 
             // Segment 0 (Right Edge): LEDs 5 – 13 (9 LEDs, Bottom -> Top)
-            for (int k = 0; k < 9; ++k) {
+            for (int k = 0; k < 8; ++k) {
                 float rawIdx = (8.0f - k) * 31.0f / 8.0f;
                 int idx = std::min(31, std::max(0, static_cast<int>(std::round(rawIdx))));
                 adalightPayload[5 + k] = rightSlices[idx];
@@ -295,8 +295,8 @@ int main(){
                 adalightPayload[43 + k] = leftSlices[idx];
             }
 
-            // Segment 3 (Bottom Edge): LEDs 57 – 74 (18 LEDs, Left -> Right)
-            for (int k = 0; k < 18; ++k) {
+            // Segment 3 (Bottom Edge): LEDs 57 – 73 (18 LEDs, Left -> Right)
+            for (int k = 0; k < 17; ++k) {
                 float rawIdx = k * 31.0f / 17.0f;
                 int idx = std::min(31, std::max(0, static_cast<int>(std::round(rawIdx))));
                 adalightPayload[57 + k] = bottomSlices[idx];
